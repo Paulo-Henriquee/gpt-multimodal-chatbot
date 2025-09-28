@@ -8,6 +8,7 @@ export interface ChatMessage {
     fileName?: string
     fileSize?: number
     mimeType?: string
+    originalText?: string
   }
   createdAt: Date
 }
