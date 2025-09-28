@@ -1,11 +1,8 @@
 import OpenAI from 'openai'
-
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY is not defined in environment variables')
-}
+import { env } from './env'
 
 export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: env.OPENAI_API_KEY,
 })
 
 export const MODELS = {
