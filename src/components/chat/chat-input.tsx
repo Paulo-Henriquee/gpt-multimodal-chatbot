@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { Send, Image as ImageIcon, Loader2 } from 'lucide-react'
+import { Send, Image as ImageIcon, Loader2, X } from 'lucide-react'
 import { ChatService } from '@/lib/chat-service'
 
 interface ChatInputProps {
@@ -12,17 +12,35 @@ interface ChatInputProps {
   disabled?: boolean
 }
 
+interface StagedImage {
+  base64: string
+  fileName: string
+  preview: string
+}
+
 export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   const [message, setMessage] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [stagedImage, setStagedImage] = useState<StagedImage | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (message.trim() && !disabled) {
+    if (!message.trim() && !stagedImage) return
+    if (disabled) return
+
+    // 🎯 ENVIO INTELIGENTE: Texto + Imagem ou só Texto
+    if (stagedImage) {
+      // Enviar texto + imagem juntos
+      const finalMessage = message.trim() || 'Analise esta imagem'
+      onSendMessage(finalMessage, 'image', stagedImage.base64)
+      setStagedImage(null) // Limpar imagem preparada
+    } else {
+      // Enviar só texto
       onSendMessage(message.trim(), 'text')
-      setMessage('')
     }
+    
+    setMessage('')
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,9 +62,14 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
     setIsUploading(true)
     try {
       const base64 = await ChatService.imageToBase64(file)
-      const imageMessage = message.trim() || 'Analise esta imagem'
-      onSendMessage(imageMessage, 'image', base64)
-      setMessage('')
+      
+      // 🎯 PREPARAR IMAGEM (não enviar ainda)
+      setStagedImage({
+        base64,
+        fileName: file.name,
+        preview: base64
+      })
+      
     } catch (error) {
       console.error('Erro ao processar imagem:', error)
       alert('Erro ao processar a imagem. Tente novamente.')
@@ -58,6 +81,11 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
     }
   }
 
+  // 🗑️ Função para remover imagem preparada
+  const handleRemoveImage = () => {
+    setStagedImage(null)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -67,6 +95,35 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
 
   return (
     <Card className="p-4 border-t">
+      {/* 🖼️ PREVIEW DA IMAGEM PREPARADA */}
+      {stagedImage && (
+        <div className="mb-3 p-3 bg-muted rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <img 
+                src={stagedImage.preview} 
+                alt="Preview" 
+                className="w-16 h-16 object-cover rounded-md"
+              />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium">Imagem preparada</p>
+              <p className="text-xs text-muted-foreground">{stagedImage.fileName}</p>
+              <p className="text-xs text-green-600 mt-1">
+                ✨ Digite sua pergunta e pressione Enter para enviar junto!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="flex gap-2">
           <div className="flex-1">
@@ -74,7 +131,10 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Digite sua mensagem... (Enter para enviar, Shift+Enter para nova linha)"
+              placeholder={isUploading 
+                ? "Processando imagem..." 
+                : "Digite sua mensagem ou selecione uma imagem... (Enter para enviar, Shift+Enter para nova linha)"
+              }
               className="min-h-[60px] resize-none"
               disabled={disabled || isUploading}
             />
@@ -84,8 +144,8 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
             <Button
               type="submit"
               size="icon"
-              disabled={!message.trim() || disabled || isUploading}
-              className="h-[60px]"
+              disabled={(!message.trim() && !stagedImage) || disabled || isUploading}
+              className={`h-[60px] ${stagedImage ? 'bg-green-600 hover:bg-green-700' : ''}`}
             >
               {disabled ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -112,7 +172,21 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
         </div>
         
         <div className="text-xs text-muted-foreground">
-          💡 Dica: Você pode enviar imagens para análise usando o botão de imagem
+          {stagedImage ? (
+            message.trim() ? (
+              <span className="text-green-600">
+                ✨ Pronto! Pressione Enter para enviar texto + imagem juntos
+              </span>
+            ) : (
+              <span className="text-blue-600">
+                📝 Digite sua pergunta sobre a imagem e pressione Enter
+              </span>
+            )
+          ) : (
+            <span>
+              💡 Dica: Selecione uma imagem primeiro, depois digite sua pergunta!
+            </span>
+          )}
         </div>
       </form>
 

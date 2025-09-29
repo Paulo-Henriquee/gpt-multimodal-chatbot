@@ -6,7 +6,7 @@ export const openai = new OpenAI({
 })
 
 export const MODELS = {
-  CHAT: 'gpt-4o',
-  VISION: 'gpt-4o',
-  WHISPER: 'whisper-1',
+  CHAT: 'gpt-4o-mini',      // 💰 Mais econômico para texto
+  VISION: 'gpt-4o-mini',    // 🖼️ Funciona com imagens + mais barato
+  WHISPER: 'whisper-1',     // 🎤 Continua igual
 } as const
